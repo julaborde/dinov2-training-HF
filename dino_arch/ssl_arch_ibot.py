@@ -4,6 +4,7 @@ import sys
 from torch import nn
 import torch
 
+import torch.distributed as dist
 from torch.nn import functional as F
 from data.collate import collate_data_and_cast
 from utils.config import load_model_configs
@@ -119,16 +120,20 @@ class SSLMetaArch(nn.Module):
                 
             self.optimizer.step() 
 
-        with torch.no_grad():
+        with torch.no_grad(): 
             self.m = self.momentum_schedule[iteration]
-             
-            for param_q, param_k in zip(
+            for param_q, param_k in zip( 
                 self.student_model.parameters(),
                 self.teacher_model.parameters()
             ):
                 param_k.data.mul_(self.m).add_((1 - self.m) * param_q.data)
 
-        # Ensure all processes are synced
+            for param in self.teacher_model.parameters():
+                dist.all_reduce(param.data, op=dist.ReduceOp.AVG) 
+             
+            for v in loss_dict.values():
+                dist.all_reduce(v, op=dist.ReduceOp.AVG)  
+ 
         self.accelerator.wait_for_everyone()
  
 
