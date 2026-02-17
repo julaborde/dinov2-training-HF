@@ -7,13 +7,55 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import ImageFolder 
 from PIL import Image, ImageFile, PngImagePlugin
 import torch.distributed as dist 
- 
+
+import numpy as np
+import random
 from data.data_augmentation_rgb import DataAugmentationDINO 
 from data.samplers import InfiniteSampler 
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 Image.MAX_IMAGE_PIXELS = None
 PngImagePlugin.MAX_TEXT_CHUNK = 16 * (1024**2)  # 16MB
+
+def pad_black_to_min_size_pil(img: Image.Image, min_h: int, min_w: int) -> Image.Image:
+    """Pad image with black (0) so that H>=min_h and W>=min_w."""
+    w, h = img.size
+    pad_h = max(0, min_h - h)
+    pad_w = max(0, min_w - w)
+
+    if pad_h == 0 and pad_w == 0:
+        return img
+
+    top = pad_h // 2
+    bottom = pad_h - top
+    left = pad_w // 2
+    right = pad_w - left
+
+    arr = np.array(img)
+    if arr.ndim == 2:
+        arr = arr[:, :, None]
+
+    arr = np.pad(
+        arr,
+        ((top, bottom), (left, right), (0, 0)),
+        mode="constant",
+        constant_values=0,
+    )
+
+    if arr.shape[2] == 1:
+        arr = arr[:, :, 0]
+
+    return Image.fromarray(arr, mode=img.mode)
+
+
+def random_tile_pil(img: Image.Image, tile_size: int, rng: random.Random) -> Image.Image:
+    """Sample one random tile of size tile_size x tile_size (black padding if needed)."""
+    img = pad_black_to_min_size_pil(img, tile_size, tile_size)
+    w, h = img.size
+    x0 = rng.randint(0, w - tile_size)
+    y0 = rng.randint(0, h - tile_size)
+    return img.crop((x0, y0, x0 + tile_size, y0 + tile_size))
+
 
 class ZScoreNormalize:
     def __init__(self, eps=1e-6):
@@ -26,9 +68,12 @@ class ZScoreNormalize:
         return (x - mean) / (std + self.eps)
 
 class RGBDatasetWithAugmentation(Dataset):
-    def __init__(self, root='dataset/remote', split='train',  augmentation=None):
+    def __init__(self, root='dataset/remote', split='train',  augmentation=None, resize=True, size=(224,224),seed=28):
         
         self.split = split
+        self.resize = resize
+        self.size = size
+        self.rng=random.Random(seed)
 
         folder_path = os.path.join(root, split) 
 
@@ -51,15 +96,19 @@ class RGBDatasetWithAugmentation(Dataset):
         img, label = self.base_dataset[index]
         if not isinstance(img, Image.Image):
             img = Image.fromarray(img)
+
         img = self.to_gray(img)  
-        # Eğitim modunda augmentation uygula
+ 
         if self.split == 'train' and self.augmentation is not None:
-            crops = self.augmentation(img) #Les crops sont normalisés via l'augmentation
-            img = self.normalize(img)
+            tile = random_tile_pil(img, self.size[0], self.rng)
+            crops = self.augmentation(tile) #Les crops sont normalisés via l'augmentation
+            img = self.normalize(tile)
             
             return img, crops
         else:
-            img = self.normalize(img)  
+            tile = random_tile_pil(img, self.size[0], self.rng)
+            
+            img = self.normalize(tile)  
             return img, label
     
     def __len__(self):
@@ -77,8 +126,6 @@ class RGBDatasetLoader:
 
         self.data_dir = cfg.dataset.dataset_path
         self.num_workers = cfg.train.num_workers 
-        self.mean = cfg.dataset.mean
-        self.std = cfg.dataset.std 
         self.resize = getattr(cfg.dataset, "resize", False)
         self.size = getattr(cfg.dataset, "size", (224,224))
         
@@ -96,17 +143,16 @@ class RGBDatasetLoader:
             augmentation = DataAugmentationDINO(
                 cfg=cfg
             ) 
+            
         train_dataset = RGBDatasetWithAugmentation(
             root=self.data_dir,
             split='train',
             augmentation=augmentation, 
-            mean=self.mean,
-            std=self.std,
-            resize=self.resize,
+            #resize=self.resize,
             size=self.size
         )
         print('train_dataset len: ',len(train_dataset) ) 
-        valid_split = 'valid'
+        valid_split = 'val'
         if not os.path.exists(os.path.join(self.data_dir, 'valid')) and os.path.exists(os.path.join(self.data_dir, 'test')):
             valid_split = 'test'
             #print(f"'valid' directory not found, using '{valid_split}' directory instead.")
@@ -114,9 +160,8 @@ class RGBDatasetLoader:
         valid_dataset = RGBDatasetWithAugmentation(
             root=self.data_dir,
             split=valid_split, 
-            mean=self.mean,
-            std=self.std,
-            resize=self.resize
+            #resize=self.resize,
+            size=self.size
         )
         sampler=None
         if is_infsampler: 
