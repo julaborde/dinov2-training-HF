@@ -5,7 +5,7 @@ from accelerate.utils import (
     DistributedType, 
 )
  
-from dataloaders.datasetloader_rgb import RGBDatasetLoader
+from dataloaders.datasetloader_custom import RGBDatasetLoader
 from dino_arch.main_dino_trainer import Trainer as MainTrainer
 from utils.config import   setup as setup_config
 from utils.dist_utils import  initialize_ddp_accelerator_from_config, print_cluster_info
@@ -42,9 +42,9 @@ def main(config_file):
     trainer.train()
  
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Accelerate-powered RGB DINO training')
+    parser = argparse.ArgumentParser(description='Accelerate-powered DINO training')
     parser.add_argument('--train_config_file', type=str, dest='train_config_file',
-                        default='ssl_default_config', help='Configuration file name for training parameters')
+                        default='/home/ge.polymtl.ca/p123239/dinov2-training-HF/configs/dino/config.yaml', help='Configuration file name for training parameters')
 
     args = parser.parse_args()
     config_file = args.train_config_file

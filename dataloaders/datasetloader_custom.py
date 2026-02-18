@@ -10,7 +10,7 @@ import torch.distributed as dist
 
 import numpy as np
 import random
-from data.data_augmentation_rgb import DataAugmentationDINO 
+from data.data_augmentation_custom import DataAugmentationDINO 
 from data.samplers import InfiniteSampler 
  
 ImageFile.LOAD_TRUNCATED_IMAGES = True

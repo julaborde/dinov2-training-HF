@@ -77,3 +77,4 @@ configs/segmentation/seg_Task.sh
 dino_segmentation/__pycache__/segmentation_trainer.cpython-312.pyc
 dino_segmentation/__pycache__/segmentation_trainer.cpython-312.pyc
 configs/dino/gazi_fingerprint.yaml
+*.safetensors

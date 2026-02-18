@@ -16,7 +16,7 @@ distribution:
   downcast_bf16: 'no'
 train:
   model_name: 'custom'
-  model_type: 'facebook/dinov2-with-registers-base'
+  model_type: 'custom'
   global_batch_size: 64
   max_iterations: 60000   
   gradient_checkpointing_enable: false 
@@ -54,7 +54,7 @@ crops:
   local_crops_size: 160
 
 dataset:
-  dataset_path: XXX
+  dataset_path: /home/ge.polymtl.ca/p123239/fake_imagenet
   shuffle: true
   mean:
     - 0.7405159
