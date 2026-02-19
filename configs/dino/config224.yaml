@@ -54,21 +54,13 @@ crops:
   local_crops_size: 160
 
 dataset:
-  dataset_path: /home/ge.polymtl.ca/p123239/fake_imagenet
+  dataset_path: /home/ge.polymtl.ca/p123239/slice_extractor/out_raw_ressample05
   shuffle: true
-  mean:
-    - 0.7405159
-    - 0.5329508
-    - 0.70579445
-  std:
-    - 0.1651425
-    - 0.21736613
-    - 0.15739934
-
+  size: 224
 output_folders:
   train_checkpoint_dir: train_checkpoints
   teacher_checkpoint_dir: teacher_checkpoints
   training_samples_dir: training_samples
   training_results_dir: training_results
   log_dir: log_files
-  main_output: outputs
+  main_output: outputs_224

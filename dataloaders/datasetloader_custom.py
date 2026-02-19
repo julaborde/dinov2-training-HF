@@ -100,13 +100,13 @@ class RGBDatasetWithAugmentation(Dataset):
         img = self.to_gray(img)  
  
         if self.split == 'train' and self.augmentation is not None:
-            tile = random_tile_pil(img, self.size[0], self.rng)
+            tile = random_tile_pil(img, self.size, self.rng)
             crops = self.augmentation(tile) #Les crops sont normalisés via l'augmentation
             img = self.normalize(tile)
             
             return img, crops
         else:
-            tile = random_tile_pil(img, self.size[0], self.rng)
+            tile = random_tile_pil(img, self.size, self.rng)
             
             img = self.normalize(tile)  
             return img, label
@@ -128,7 +128,6 @@ class RGBDatasetLoader:
         self.num_workers = cfg.train.num_workers 
         self.resize = getattr(cfg.dataset, "resize", False)
         self.size = getattr(cfg.dataset, "size", (224,224))
-        
         batch_size = getattr(cfg.train, "batch_size_per_gpu", None)
         if batch_size:
             self.batch_size=batch_size
