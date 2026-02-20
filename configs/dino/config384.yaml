@@ -17,7 +17,7 @@ distribution:
 train:
   model_name: 'custom'
   model_type: 'custom'
-  global_batch_size: 64
+  global_batch_size: 128
   max_iterations: 60000   
   gradient_checkpointing_enable: false 
   clip_grad: 3.0 

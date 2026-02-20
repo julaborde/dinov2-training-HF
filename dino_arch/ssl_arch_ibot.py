@@ -19,6 +19,32 @@ from utils.dino_utils import (
 from losses.ibot_patch_loss import iBOTPatchLoss
 from utils.logger_utils import write_to_main_log 
 
+import torch
+import torch.distributed as dist
+
+@torch.no_grad()
+def debug_check_teacher_sync(teacher_model, accelerator, every=500, iteration=0):
+    if not dist.is_initialized():
+        return
+    if iteration % every != 0:
+        return
+
+    teacher = accelerator.unwrap_model(teacher_model)
+
+    # prend un param (ex: le premier) et calcule une statistique scalaire
+    p = next(teacher.parameters())
+    s = p.float().mean()  # scalaire
+
+    # gather sur tous les ranks
+    world_size = dist.get_world_size()
+    gathered = [torch.zeros_like(s) for _ in range(world_size)]
+    dist.all_gather(gathered, s)
+
+    vals = torch.stack(gathered).cpu()
+    max_diff = (vals - vals[0]).abs().max().item()
+
+    if dist.get_rank() == 0:
+        print(f"[DEBUG] teacher mean param max_diff across ranks = {max_diff:.3e}")
 
 class SSLMetaArch(nn.Module):
     def __init__(
@@ -95,8 +121,8 @@ class SSLMetaArch(nn.Module):
                 if i == 0:
                     param_group["weight_decay"] = self.wd_schedule[iteration]
  
-            teacher_temp = self.config.train.teacher_temp
-            
+            #teacher_temp = self.config.train.teacher_temp
+            teacher_temp = float(self.teacher_temp[iteration])
             loss_dict = self._compute_loss(crops, teacher_temp)
             total_loss = loss_dict['total_loss']
             
@@ -128,12 +154,14 @@ class SSLMetaArch(nn.Module):
             ):
                 param_k.data.mul_(self.m).add_((1 - self.m) * param_q.data)
 
-            for param in self.teacher_model.parameters():
-                dist.all_reduce(param.data, op=dist.ReduceOp.AVG) 
+            # for param in self.teacher_model.parameters():
+            #     dist.all_reduce(param.data, op=dist.ReduceOp.AVG) 
              
             for v in loss_dict.values():
                 dist.all_reduce(v, op=dist.ReduceOp.AVG)  
- 
+
+        # debug_check_teacher_sync(self.teacher_model, self.accelerator, every=500, iteration=iteration)
+
         self.accelerator.wait_for_everyone()
  
 

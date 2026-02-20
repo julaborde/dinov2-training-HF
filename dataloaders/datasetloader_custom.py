@@ -68,7 +68,7 @@ class ZScoreNormalize:
         return (x - mean) / (std + self.eps)
 
 class RGBDatasetWithAugmentation(Dataset):
-    def __init__(self, root='dataset/remote', split='train',  augmentation=None, resize=True, size=(224,224),seed=28):
+    def __init__(self, root='dataset/remote', split='train',  augmentation=None, resize=True, size=384,seed=28):
         
         self.split = split
         self.resize = resize
@@ -100,9 +100,9 @@ class RGBDatasetWithAugmentation(Dataset):
         img = self.to_gray(img)  
  
         if self.split == 'train' and self.augmentation is not None:
-            tile = random_tile_pil(img, self.size, self.rng)
-            crops = self.augmentation(tile) #Les crops sont normalisés via l'augmentation
-            img = self.normalize(tile)
+            # tile = random_tile_pil(img, self.size, self.rng)
+            crops = self.augmentation(img) #Les crops sont normalisés via l'augmentation
+            img = self.normalize(img)
             
             return img, crops
         else:
