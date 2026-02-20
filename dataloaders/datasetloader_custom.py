@@ -104,7 +104,7 @@ class RGBDatasetWithAugmentation(Dataset):
             crops = self.augmentation(img) #Les crops sont normalisés via l'augmentation
             img = self.normalize(img)
             
-            return img, crops
+            return 0, crops
         else:
             tile = random_tile_pil(img, self.size, self.rng)
             
