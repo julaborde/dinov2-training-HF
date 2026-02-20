@@ -19,7 +19,7 @@ PngImagePlugin.MAX_TEXT_CHUNK = 16 * (1024**2)  # 16MB
 
 def pad_black_to_min_size_pil(img: Image.Image, min_h: int, min_w: int) -> Image.Image:
     """Pad image with black (0) so that H>=min_h and W>=min_w."""
-    w, h = img.size
+    w,h = img.size
     pad_h = max(0, min_h - h)
     pad_w = max(0, min_w - w)
 
@@ -47,11 +47,35 @@ def pad_black_to_min_size_pil(img: Image.Image, min_h: int, min_w: int) -> Image
 
     return Image.fromarray(arr, mode=img.mode)
 
+from torchvision.transforms import functional as F
+
+class PadToMinSize:
+    def __init__(self, min_size=384, fill=0):
+        self.min_size = min_size
+        self.fill = fill
+
+    def __call__(self, img):
+        # img: PIL Image
+        w, h = img.size
+        pad_w = max(0, self.min_size - w)
+        pad_h = max(0, self.min_size - h)
+
+        if pad_w == 0 and pad_h == 0:
+            return img  # rien à faire
+
+        # padding symétrique
+        padding = [
+            pad_w // 2,                 # left
+            pad_h // 2,                 # top
+            pad_w - pad_w // 2,         # right
+            pad_h - pad_h // 2          # bottom
+        ]
+        return F.pad(img, padding, fill=self.fill)
 
 def random_tile_pil(img: Image.Image, tile_size: int, rng: random.Random) -> Image.Image:
     """Sample one random tile of size tile_size x tile_size (black padding if needed)."""
     img = pad_black_to_min_size_pil(img, tile_size, tile_size)
-    w, h = img.size
+    w,h = img.size
     x0 = rng.randint(0, w - tile_size)
     y0 = rng.randint(0, h - tile_size)
     return img.crop((x0, y0, x0 + tile_size, y0 + tile_size))
@@ -82,7 +106,10 @@ class RGBDatasetWithAugmentation(Dataset):
             transform=None  
         )
 
-        self.to_gray = transforms.Grayscale(num_output_channels=1)
+        self.to_gray = transforms.Compose([ 
+            transforms.Grayscale(num_output_channels=1),
+            PadToMinSize(min_size=size, fill=0)
+        ])
 
         self.augmentation = augmentation
 
@@ -101,10 +128,12 @@ class RGBDatasetWithAugmentation(Dataset):
  
         if self.split == 'train' and self.augmentation is not None:
             # tile = random_tile_pil(img, self.size, self.rng)
-            crops = self.augmentation(img) #Les crops sont normalisés via l'augmentation
-            img = self.normalize(img)
+            crops = self.augmentation(img) #Les crops sont normalisés via l'augmentation+
+
             
-            return 0, crops
+            img = random_tile_pil(img, self.size, self.rng)
+            img = self.normalize(img)
+            return img, crops
         else:
             tile = random_tile_pil(img, self.size, self.rng)
             
